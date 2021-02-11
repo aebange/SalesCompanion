@@ -17,9 +17,15 @@
 #######################################################################
 
 # Import dependent libraries
+# Used for parsing the Html
 from bs4 import BeautifulSoup
+# Used for capturing hotkey presses
 from pynput.keyboard import Listener
+# Used for getting file directory info
 from os import getcwd
+
+
+# import re
 
 # Open the html file that is to be parsed by the program
 # TODO: Automate the detection on this, manual entry obviously won't work
@@ -92,26 +98,49 @@ def position_parse(local_target_div):
                 return local_child.contents[0]
 
 
+# Returns the contact's MMC account identifier as a string
+def mmc_account_parse(local_target_div):
+    for local_records in local_target_div.find_all("records-formula-output",
+                                                   attrs={"data-output-element-id": "output-field",
+                                                          "records-formulaoutput_formulaoutput-host": ""}):
+        local_children = local_records.findChildren("lightning-formatted-text")
+        for local_child in local_children:
+            return local_child.contents[0]
+
+
 # Provides the full address and independent address fields as separate string objects
-# TODO: Update this to work with the new target div method, get rid of prints
-def address_information_parse():
-    for local_a in soup.find_all("a", attrs={'target': "_blank", 'rel': 'noopener'}):
-        # full_address = local_a.get('title')
+def address_information_parse(local_target_div):
+    for local_a in local_target_div("a", attrs={'target': "_blank", 'rel': 'noopener'}):
+        full_address = local_a.get('title')
         local_children = local_a.findChildren("div", attrs={"class": "slds-truncate"})
         local_count = 0
         for local_child in local_children:
             if local_count == 0:
-                # street_address = local_child.contents
+                street_address = local_child.contents
                 local_count += 1
             elif local_count == 1:
                 local_pair = local_child.contents[0]
-                city_address = local_pair.split(',')[0]
-                state_zip_address = local_pair.split(',')[1]
+                city_address_pair = local_pair.split(',')
+                # Having issues with python throwing IndexErrors here, no clue why. Doing a workaround
+                for item in city_address_pair:
+                    city_address = item
+                    break
+                # Still having IndexErrors with range. Again ran out of patience and am working around with for loops
+                index = 0
+                for item2 in city_address_pair:
+                    if index == 1:
+                        state_zip_address = item2
+                    else:
+                        index += 1
                 # state_address = state_zip_address.split(' ')[1]
-                state_address, zip_address = state_zip_address.split(' ')[1], state_zip_address.split(' ')[2]
+
+                state_address, zip_address = (state_zip_address.split(' '))[1], (state_zip_address.split(' '))[2]
                 print("City is {}".format(city_address))
                 print("State is {}".format(state_address))
                 print("Zip is {}".format(zip_address))
+                return street_address, state_address, zip_address, full_address
+            else:
+                local_count += 1
 
 
 # Fires a function when a ctrl+` is pressed
@@ -122,10 +151,12 @@ def on_press(key):
         pass
 
 
-# Collect events until a key is pressed
-with Listener(
-        on_press=on_press) as listener:
-    listener.join()
+# Waits until a key is pressed, then checks it with the on_press function
+def hotkey_listener():
+    # Collect events until a key is pressed
+    with Listener(
+            on_press=on_press) as listener:
+        listener.join()
 
 
 # TODO: Fix this mess and clear prints
@@ -133,11 +164,11 @@ targetName = get_target_name()
 print(targetName)
 targetDiv = find_target_div(targetName)
 print(account_name_parse(targetDiv))
+print(position_parse(targetDiv))
 print(phone_number_parse(targetDiv))
 print(email_parse(targetDiv))
-print(position_parse(targetDiv))
-# address_information_parse()
-
+print(mmc_account_parse(targetDiv))
+address_information_parse(targetDiv)
 
 contents = f.close()
 print("Exit Code 0")
