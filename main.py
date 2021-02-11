@@ -23,16 +23,19 @@ from bs4 import BeautifulSoup
 from pynput.keyboard import Listener
 # Used for getting file directory info
 from os import getcwd
+# Used for copying the .docx template for editing
+from shutil import copyfile
+from os import rename
 
-
-# import re
 
 # Open the html file that is to be parsed by the program
 # TODO: Automate the detection on this, manual entry obviously won't work
-temporary_file = 'John Doe _ Salesforce.html'
-target_file_directory = getcwd() + "\\" + temporary_file
-with open(target_file_directory, 'r') as f:
+temporaryFile = 'John Doe _ Salesforce.html'
+targetFile = getcwd() + "\\" + temporaryFile
+with open(targetFile, 'r') as f:
     contents = f.read()
+
+templateFile = 'Template.docx'
 
 # Create the soup object we will use to parse
 soup = BeautifulSoup(contents, features="html.parser")
@@ -111,7 +114,6 @@ def mmc_account_parse(local_target_div):
 # Provides the full address and independent address fields as separate string objects
 def address_information_parse(local_target_div):
     for local_a in local_target_div("a", attrs={'target': "_blank", 'rel': 'noopener'}):
-        full_address = local_a.get('title')
         local_children = local_a.findChildren("div", attrs={"class": "slds-truncate"})
         local_count = 0
         for local_child in local_children:
@@ -132,13 +134,8 @@ def address_information_parse(local_target_div):
                         state_zip_address = item2
                     else:
                         index += 1
-                # state_address = state_zip_address.split(' ')[1]
-
                 state_address, zip_address = (state_zip_address.split(' '))[1], (state_zip_address.split(' '))[2]
-                print("City is {}".format(city_address))
-                print("State is {}".format(state_address))
-                print("Zip is {}".format(zip_address))
-                return street_address, state_address, zip_address, full_address
+                return street_address, city_address, state_address, zip_address
             else:
                 local_count += 1
 
@@ -151,6 +148,14 @@ def on_press(key):
         pass
 
 
+def lead_sheet_creation(local_template_file, local_account_name, local_city_name, local_state_name):
+    cwd = getcwd()
+    new_file = copyfile(local_template_file, 'incomplete.docx')
+    file_name = 'MMC - MSH Lead - ' + local_account_name + ' - ' + local_city_name + ' - ' + local_state_name + '.docx'
+    newer_file = rename(new_file, file_name)
+    print(newer_file)
+
+
 # Waits until a key is pressed, then checks it with the on_press function
 def hotkey_listener():
     # Collect events until a key is pressed
@@ -160,15 +165,15 @@ def hotkey_listener():
 
 
 # TODO: Fix this mess and clear prints
-targetName = get_target_name()
-print(targetName)
-targetDiv = find_target_div(targetName)
-print(account_name_parse(targetDiv))
-print(position_parse(targetDiv))
-print(phone_number_parse(targetDiv))
-print(email_parse(targetDiv))
-print(mmc_account_parse(targetDiv))
-address_information_parse(targetDiv)
+contactName = get_target_name()
+targetDiv = find_target_div(contactName)
+acctName = account_name_parse(targetDiv)
+contactPosition = position_parse(targetDiv)
+contactPhoneNum = phone_number_parse(targetDiv)
+contactEmail = email_parse(targetDiv)
+mmcAcctNum = mmc_account_parse(targetDiv)
+acctStreet, acctCity, acctState, acctZip = address_information_parse(targetDiv)
+lead_sheet_creation(templateFile, acctName, acctCity, acctState)
 
 contents = f.close()
 print("Exit Code 0")
